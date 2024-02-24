@@ -4,13 +4,13 @@ from numba import njit, prange  # type: ignore
 
 def init_boids(boids: np.ndarray, asp: float, vrange: tuple) -> np.ndarray:
     """Initialize random boids and their speed in array from uniform distribution"""
-    n = boids.shape[0]
+    N = boids.shape[0]
     rng = np.random.default_rng()
     low, high = vrange
-    boids[:, 0] = rng.uniform(0., asp, size=n)
-    boids[:, 1] = rng.uniform(0., 1., size=n)
-    alpha = rng.uniform(0, 2*np.pi, size=n)
-    v = rng.uniform(low=low, high=high, size=n)
+    boids[:, 0] = rng.uniform(0., asp, size=N)
+    boids[:, 1] = rng.uniform(0., 1., size=N)
+    alpha = rng.uniform(0, 2*np.pi, size=N)
+    v = rng.uniform(low=low, high=high, size=N)
     c, s = np.cos(alpha), np.sin(alpha)
     boids[:, 2] = v * c
     boids[:, 3] = v * s
@@ -59,21 +59,6 @@ def propagate(boids: np.ndarray,
 
 
 @njit()
-def walls(boids: np.ndarray, asp: float, param: int):
-    c = 1
-    x = boids[:, 0]
-    y = boids[:, 1]
-    order = param
-
-    a_left = 1 / (np.abs(x) + c) ** order
-    a_right = -1 / (np.abs(x - asp) + c) ** order
-
-    a_bottom = 1 / (np.abs(y) + c) ** order
-    a_top = -1 / (np.abs(y - 1.) + c) ** order
-
-    return np.column_stack((a_left + a_right, a_bottom + a_top))
-
-@njit()
 def smoothstep(edge0: float, edge1: float, x: np.ndarray | float) -> np.ndarray | float:
    x = np.clip((x - edge0) / (edge1 - edge0), 0., 1.)
    return x * x * (3.0 - 2.0 * x)
@@ -92,30 +77,6 @@ def better_walls(boids: np.ndarray, asp: float, param: float):
 
     return np.column_stack((a_left + a_right, a_bottom + a_top))
 
-
-
-@njit()
-def distance(boids: np.ndarray) -> np.ndarray:
-    """Calculates pairwise euclidean distance between boids"""
-    p = boids[:, :2]
-    n = p.shape[0]
-    dist = np.zeros(shape=(n, n), dtype=np.float64)
-    for i in range(n):
-        for j in range(n):
-            v = p[i] - p[j]
-            d = (v @ v)
-            dist[i, j] = d
-    dist = np.sqrt(dist)
-    return dist
-
-
-@njit()
-def normalize(v):
-    """Normalize vector to norm = 1"""
-    v_norm = np.linalg.norm(v)
-    if norm == 0:
-        return v
-    return v / v_norm
 
 
 @njit(parallel=True)
@@ -177,16 +138,17 @@ def noise():
 def flocking(boids: np.ndarray,
              perception: float,
              coeffs: np.ndarray,
+             N_neighbors: int,
              asp: float,
              vrange: tuple) -> np.ndarray:
     """
     Implements boids visibility computation and acceleration computation via four different
     components - cohesion, alignment, separation, noise within sector of certain radius and angle
     """
-    n = boids.shape[0]
-    mask = visibility(boids, perception, 20)
+    N = boids.shape[0]
+    mask = visibility(boids, perception, N_neighbors)
     wal = better_walls(boids, asp, 1)
-    for i in prange(n):
+    for i in prange(N):
         if not np.any(mask[i]):
             coh = np.zeros(2)
             alg = np.zeros(2)
@@ -213,10 +175,11 @@ def simulation_step(boids: np.ndarray,
                     asp: float,
                     perception: float,
                     coefficients: np.ndarray,
+                    N_neighbors: int,
                     vrange: tuple,
                     arange: tuple,
                     dt: float) -> None:
     """Implements full step of boids model simulation with updating their positions and propagation"""
-    mask = flocking(boids, perception, coefficients, asp, vrange)
+    mask = flocking(boids, perception, coefficients, N_neighbors, asp, vrange)
     propagate(boids, dt, vrange, arange)
     return mask

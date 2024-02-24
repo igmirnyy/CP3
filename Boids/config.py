@@ -12,6 +12,7 @@ COEFFITIENTS = {"Alignment": 0.3,
                 "Separation": 0.4,
                 "Walls": 7,
                 "Noise": 0.01}
+BOID_SCALE = 1
 N_NEIGHBORS = 20
 VIDEO = False
 FRAMES = 1800

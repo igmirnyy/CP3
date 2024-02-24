@@ -28,8 +28,6 @@ class MyGame(arcade.Window):
 
         init_boids(self.boids, cfg.ASPECT_RATIO, cfg.VELOCITY_RANGE)
     
-        self.boid_w = 20
-        self.boid_h = 10
 
         self.frame_count = 0
         self.background = arcade.load_texture("Boids/assets/brickwall.jpg")
@@ -39,9 +37,9 @@ class MyGame(arcade.Window):
         self.bats = arcade.SpriteList()
         self.visible_boids = cfg.N
         self.coefs = np.array(list(cfg.COEFFITIENTS.values()), dtype=np.float64)
-        self.bats.append(arcade.Sprite(texture=self.active_bat, center_x= self.boids[0][0] * cfg.SCREEN_WIDTH, center_y= self.boids[0][0] * cfg.SCREEN_HEIGHT))
+        self.bats.append(arcade.Sprite(texture=self.active_bat, center_x= self.boids[0][0] * cfg.SCREEN_WIDTH, center_y= self.boids[0][0] * cfg.SCREEN_HEIGHT, scale=cfg.BOID_SCALE))
         for boid in self.boids[1:]:
-               self.bats.append(arcade.Sprite(texture=self.bat, center_x= boid[0] * cfg.SCREEN_WIDTH, center_y= boid[0] * cfg.SCREEN_HEIGHT))
+               self.bats.append(arcade.Sprite(texture=self.bat, center_x= boid[0] * cfg.SCREEN_WIDTH, center_y= boid[0] * cfg.SCREEN_HEIGHT, scale=cfg.BOID_SCALE))
         self.processing_time = 0
 
         # Time for on_draw
@@ -72,7 +70,7 @@ class MyGame(arcade.Window):
        
         self.bats.draw()
         # Code to draw the screen goes here
-        arcade.draw_lrtb_rectangle_filled(0, 200, cfg.SCREEN_HEIGHT, cfg.SCREEN_HEIGHT - 200, arcade.csscolor.ANTIQUE_WHITE)
+        arcade.draw_lrtb_rectangle_filled(0, 200, cfg.SCREEN_HEIGHT, cfg.SCREEN_HEIGHT - 170, arcade.csscolor.ANTIQUE_WHITE)
       # Display timings
         output = f"Processing time: {self.processing_time:.3f}"
         arcade.draw_text(output, 20, cfg.SCREEN_HEIGHT - 15, arcade.color.BLACK, 12)
@@ -98,7 +96,7 @@ class MyGame(arcade.Window):
 
         # Call update on all sprites (The sprites don't do much in this
         # example though.)
-        mask = simulation_step(self.boids, cfg.ASPECT_RATIO, cfg.PERCEPTION, self.coefs, cfg.VELOCITY_RANGE, cfg.ACCELERATION_RANGE, cfg.dt)
+        mask = simulation_step(self.boids, cfg.ASPECT_RATIO, cfg.PERCEPTION, self.coefs,cfg.N_NEIGHBORS, cfg.VELOCITY_RANGE, cfg.ACCELERATION_RANGE, cfg.dt)
         self.visible_boids = 0
         for i, boid, bat in zip(range(cfg.N), self.boids, self.bats):
             x = boid[0]* cfg.SCREEN_WIDTH
