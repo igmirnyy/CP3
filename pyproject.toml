@@ -16,6 +16,8 @@ tqdm = "^4.66.1"
 ipykernel = "^6.26.0"
 imageio = "^2.33.0"
 scipy = "^1.11.4"
+pyqt6 = "^6.6.1"
+arcade = "^2.6.17"
 
 
 [[tool.poetry.source]]
