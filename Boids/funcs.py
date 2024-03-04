@@ -3,7 +3,7 @@ from numba import njit, prange  # type: ignore
 
 
 def init_boids(boids: np.ndarray, asp: float, vrange: tuple) -> np.ndarray:
-    """Initialize random boids and their speed in array from uniform distribution"""
+    """Initialize random boids and their speed"""
     N = boids.shape[0]
     rng = np.random.default_rng()
     low, high = vrange
@@ -17,20 +17,11 @@ def init_boids(boids: np.ndarray, asp: float, vrange: tuple) -> np.ndarray:
     return boids
 
 
-@njit()
-def directions(boids: np.ndarray, dt: float) -> np.ndarray:
-    """Calculate directions for arrows in boids model by propagating with speed and acceleration"""
-    return np.hstack((boids[:, :2] - dt * boids[:, 2:4], boids[:, :2]))
-
-
-@njit()
-def norm(arr: np.ndarray):
-    """Calculates norm via first axis"""
-    return np.sqrt(np.sum(arr**2, axis=1))
 
 
 @njit()
 def center_point(array: np.ndarray):
+    """Calculates center point of 2d np.array"""
     center = np.empty(2, dtype=np.float64)
     center[0] = np.mean(array[:, 0])
     center[1] = np.mean(array[:, 1])
@@ -41,6 +32,7 @@ def center_point(array: np.ndarray):
 
 @njit()
 def vclip(v: np.ndarray, vrange: tuple[float, float]):
+    """Clips array elements which norm is out of bounds"""
     norm = np.sqrt(v[:, 0] ** 2 + v[:, 1]**2)
     mask = norm > vrange[1]
     if np.any(mask):
@@ -51,6 +43,7 @@ def propagate(boids: np.ndarray,
               dt: float,
               vrange: tuple[float, float],
               arange: tuple[float, float]):
+    """Updates position and velocity of boids"""
     vclip(boids[:, 4:6], arange)
     boids[:, 2:4] += dt * boids[:, 4:6]
     vclip(boids[:, 2:4], vrange)
@@ -65,6 +58,7 @@ def smoothstep(edge0: float, edge1: float, x: np.ndarray | float) -> np.ndarray 
 
 @njit()
 def better_walls(boids: np.ndarray, asp: float, param: float):
+    """Calculates walls impact on boids"""
     x = boids[:, 0]
     y = boids[:, 1]
     w = param
@@ -82,16 +76,17 @@ def better_walls(boids: np.ndarray, asp: float, param: float):
 @njit(parallel=True)
 def visibility(boids: np.ndarray, perception: float, n_neighbours: int) -> np.ndarray:
     """
-    Calculates pairwise euclidean distance between boids, angles and returns mask of visibility,
-    implements a sector of angle width = (-arccos(angle), arccos(angle)) and radius = perception
+    Calculates 2d np.array where element i, j is True if boid j affects boid i otherwize false
     """
     N = boids.shape[0]
+    perception = perception ** 2
     D = np.empty(shape=(N, N), dtype=np.float64)
     mask = np.empty(shape=(N, N), dtype=np.bool8)
     for i in prange(N):
         D[i] = (boids[:, 0] - boids[i, 0]) ** 2 + (boids[:, 1] - boids[i, 1]) ** 2 
-        farthest_neighbour = np.sort(D[i])[n_neighbours + 1]
-        mask[i] = D[i] < min(farthest_neighbour, perception)
+        farthest_neighbour = np.sort(D[i])[n_neighbours]
+        distance = min(farthest_neighbour, perception)
+        mask[i] = D[i] <= distance
         mask[i,i] = False
 
     return mask
@@ -102,7 +97,7 @@ def cohesion(boids: np.ndarray,
              idx: int,
              neigh_mask: np.ndarray,
              perception: float) -> np.ndarray:
-    """Implements cohesion component of acceleration via median center of group in sector"""
+    """Caculates cohesion component of acceleration"""
     center = center_point(boids[neigh_mask, :2])
     a = (center - boids[idx, :2]) / perception
     return a
@@ -112,9 +107,9 @@ def cohesion(boids: np.ndarray,
 def separation(boids: np.ndarray,
                idx: int,
                neigh_mask: np.ndarray) -> np.ndarray:
-    """Implements separation component of acceleration via median within group in sector"""
+    """Calculates separation component of acceleration"""
     d = center_point(boids[neigh_mask, :2] - boids[idx, :2])
-    return -d / ((d[0]**2 + d[1]**2) + 0.0001)
+    return -d / ((d[0]**2 + d[1]**2) + 1e-8)
 
 
 @njit()
@@ -122,7 +117,7 @@ def alignment(boids: np.ndarray,
               idx: int,
               neigh_mask: np.ndarray,
               vrange: tuple) -> np.ndarray:
-    """Implements median-based alingment component of acceleration within group in sector"""
+    """Calculates alignment component of acceleration"""
     v_mean = center_point(boids[neigh_mask, 2:4])
     a = (v_mean - boids[idx, 2:4]) / (2 * vrange[1])
     return a
@@ -130,7 +125,7 @@ def alignment(boids: np.ndarray,
 
 @njit()
 def noise():
-    """Implements of random noise in (-1, 1) interval for two coordinated, njit-compilable"""
+    """Returns random noise uniformly disrtributed over (-1, 1)"""
     return np.random.uniform(-1,1,2)
 
 
@@ -142,8 +137,7 @@ def flocking(boids: np.ndarray,
              asp: float,
              vrange: tuple) -> np.ndarray:
     """
-    Implements boids visibility computation and acceleration computation via four different
-    components - cohesion, alignment, separation, noise within sector of certain radius and angle
+    Calculates boids visibility and updates acceleration using cohesion, alignment, separiotion, walls and noise
     """
     N = boids.shape[0]
     mask = visibility(boids, perception, N_neighbors)
@@ -171,7 +165,7 @@ def flocking(boids: np.ndarray,
                        + coeffs[4] * ns[1])
     return mask
 
-def simulation_step(boids: np.ndarray,
+def step(boids: np.ndarray,
                     asp: float,
                     perception: float,
                     coefficients: np.ndarray,
@@ -179,7 +173,7 @@ def simulation_step(boids: np.ndarray,
                     vrange: tuple,
                     arange: tuple,
                     dt: float) -> None:
-    """Implements full step of boids model simulation with updating their positions and propagation"""
+    """Calculates boids acceleration and update their positions"""
     mask = flocking(boids, perception, coefficients, N_neighbors, asp, vrange)
     propagate(boids, dt, vrange, arange)
     return mask
