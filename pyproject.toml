@@ -18,6 +18,7 @@ imageio = {extras = ["ffmpeg"], version = "^2.34.0"}
 scipy = "^1.11.4"
 pyqt6 = "^6.6.1"
 arcade = "^2.6.17"
+taichi = "^1.7.1"
 
 
 [[tool.poetry.source]]
