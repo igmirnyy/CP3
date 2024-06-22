@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from numba import njit, prange
 
-from waves import start_impulse
+from impulse import start_impulse
 
 
 class Polygon:
