@@ -134,7 +134,7 @@ class Model:
             height//4,
             np.pi,
         )
-        self.light_source = np.array([-0.6, -0.2])
+        self.light_source = np.array([-1/2, -1/6])
         self.source_angle = 0
         self.c = c
         self.dt = dt
